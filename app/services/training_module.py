@@ -59,12 +59,20 @@ potential issues, and relevant Indonesian laws. Always respond in valid JSON for
                 }
             ],
             temperature=0.3,
-            max_tokens=4000,
+            max_completion_tokens=16000,
             response_format={"type": "json_object"}
         )
         
         import json
-        module_content = json.loads(response.choices[0].message.content)
+        response_content = response.choices[0].message.content
+        
+        if not response_content:
+            raise ValueError(f"Empty response from OpenAI. Finish reason: {response.choices[0].finish_reason}")
+        
+        try:
+            module_content = json.loads(response_content)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Failed to parse OpenAI response as JSON: {str(e)}. Response: {response_content[:500]}")
         
         return module_content
     

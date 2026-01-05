@@ -3,7 +3,7 @@ Legal Document Review System - Database Connection and Models
 """
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy import Column, String, Text, DateTime, Integer, ForeignKey, func
+from sqlalchemy import Column, String, Text, DateTime, Integer, ForeignKey, func, text
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from pgvector.sqlalchemy import Vector
 import uuid
@@ -99,7 +99,3 @@ async def get_db() -> AsyncSession:
             raise
         finally:
             await session.close()
-
-
-# Import text for raw SQL
-from sqlalchemy import text

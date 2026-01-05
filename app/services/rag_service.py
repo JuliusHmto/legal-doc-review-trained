@@ -70,22 +70,22 @@ class RAGService:
         embedding_str = "[" + ",".join(map(str, query_embedding)) + "]"
         
         # Query using pgvector cosine similarity
+        # Note: embedding vector is directly interpolated (safe since internally generated)
         sql = text(f"""
             SELECT 
                 id,
                 module_id,
                 chunk_text,
-                1 - (embedding <=> :embedding::vector) as similarity
+                1 - (embedding <=> '{embedding_str}'::vector) as similarity
             FROM embeddings
-            WHERE 1 - (embedding <=> :embedding::vector) > :threshold
-            ORDER BY embedding <=> :embedding::vector
+            WHERE 1 - (embedding <=> '{embedding_str}'::vector) > :threshold
+            ORDER BY embedding <=> '{embedding_str}'::vector
             LIMIT :limit
         """)
         
         result = await db.execute(
             sql,
             {
-                "embedding": embedding_str,
                 "threshold": similarity_threshold,
                 "limit": limit
             }
@@ -114,22 +114,22 @@ class RAGService:
         query_embedding = await self.create_embedding(query)
         embedding_str = "[" + ",".join(map(str, query_embedding)) + "]"
         
+        # Note: embedding vector is directly interpolated (safe since internally generated)
         sql = text(f"""
             SELECT 
                 id,
                 module_id,
                 chunk_text,
-                1 - (embedding <=> :embedding::vector) as similarity
+                1 - (embedding <=> '{embedding_str}'::vector) as similarity
             FROM embeddings
             WHERE module_id = :module_id
-            ORDER BY embedding <=> :embedding::vector
+            ORDER BY embedding <=> '{embedding_str}'::vector
             LIMIT :limit
         """)
         
         result = await db.execute(
             sql,
             {
-                "embedding": embedding_str,
                 "module_id": module_id,
                 "limit": limit
             }

@@ -85,7 +85,6 @@ class ComplianceIssue(BaseModel):
 
 class ReviewRequest(BaseModel):
     """Request for document review."""
-    document_id: UUID
     focus_areas: Optional[List[str]] = None  # e.g., ["employment", "data_protection"]
 
 
