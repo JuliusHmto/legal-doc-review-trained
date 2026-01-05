@@ -112,6 +112,17 @@ class ReviewSummary(BaseModel):
     low_severity_count: int
     status: str  # "COMPLIANT", "NEEDS_REVIEW", "NON_COMPLIANT"
 
+class HistoryItem(BaseModel):
+    """Combined review and document info for history list."""
+    review_id: UUID
+    document_id: UUID
+    filename: str
+    compliance_score: int
+    reviewed_at: datetime
+    status: str
+
+    class Config:
+        from_attributes = True
 
 # ============ RAG Schemas ============
 

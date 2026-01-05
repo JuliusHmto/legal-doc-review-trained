@@ -22,9 +22,68 @@ const API_BASE = '/api';
 
 // --- Initialization ---
 document.addEventListener('DOMContentLoaded', () => {
+    initTheme();
     setupDragAndDrop();
     loadLawCategories();
+    setupNavigation();
 });
+
+// --- Theme Management ---
+function initTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'dark-theme';
+    document.body.className = savedTheme;
+    updateThemeUI(savedTheme);
+
+    document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+}
+
+function toggleTheme() {
+    const currentTheme = document.body.className;
+    const newTheme = currentTheme === 'dark-theme' ? 'light-theme' : 'dark-theme';
+    document.body.className = newTheme;
+    localStorage.setItem('theme', newTheme);
+    updateThemeUI(newTheme);
+}
+
+function updateThemeUI(theme) {
+    const icon = document.getElementById('theme-icon');
+    const text = document.getElementById('theme-text');
+    if (theme === 'dark-theme') {
+        icon.textContent = '🌙';
+        text.textContent = 'Dark Mode';
+    } else {
+        icon.textContent = '☀️';
+        text.textContent = 'Light Mode';
+    }
+}
+
+// --- Navigation ---
+function setupNavigation() {
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const nav = item.getAttribute('data-nav');
+
+            // Update UI
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
+
+            // Show section
+            if (nav === 'upload') showSection('upload');
+            else if (nav === 'history') {
+                showSection('history');
+                loadHistory();
+            }
+            else if (nav === 'documents') {
+                showSection('documents');
+                loadDocuments();
+            }
+        });
+    });
+
+    document.getElementById('back-to-new-btn').addEventListener('click', () => {
+        document.querySelector('[data-nav="upload"]').click();
+    });
+}
 
 // --- File Upload Logic ---
 function setupDragAndDrop() {
@@ -108,6 +167,109 @@ startProcessBtn.addEventListener('click', async () => {
         showSection('upload');
     }
 });
+
+// --- History & Documents Logic ---
+async function loadHistory() {
+    const tbody = document.getElementById('history-table-body');
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 2rem">Loading history...</td></tr>';
+
+    try {
+        const res = await fetch(`${API_BASE}/history`);
+        const history = await res.json();
+
+        if (history.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><div class="empty-state-icon">📂</div>No history found. Start a new analysis!</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = '';
+        history.forEach(item => {
+            const tr = document.createElement('tr');
+            const date = new Date(item.reviewed_at).toLocaleDateString();
+
+            let badgeClass = 'status-review';
+            if (item.status === 'COMPLIANT') badgeClass = 'status-compliant';
+            else if (item.status === 'NON-COMPLIANT') badgeClass = 'status-danger';
+
+            tr.innerHTML = `
+                <td><strong>${item.filename}</strong></td>
+                <td>${item.compliance_score}</td>
+                <td><span class="status-badge ${badgeClass}">${item.status}</span></td>
+                <td>${date}</td>
+                <td><button class="btn btn-text" onclick="viewExistingReport('${item.document_id}')">View Report</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="5" style="color: var(--danger); text-align: center; padding: 2rem">Failed to load history</td></tr>';
+    }
+}
+
+async function loadDocuments() {
+    const tbody = document.getElementById('documents-table-body');
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem">Loading documents...</td></tr>';
+
+    try {
+        const res = await fetch(`${API_BASE}/documents`);
+        const docs = await res.json();
+
+        if (docs.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="empty-state"><div class="empty-state-icon">📄</div>No documents uploaded yet.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = '';
+        docs.forEach(doc => {
+            const tr = document.createElement('tr');
+            const date = new Date(doc.uploaded_at).toLocaleDateString();
+            tr.innerHTML = `
+                <td><strong>${doc.filename}</strong></td>
+                <td>${doc.file_type.toUpperCase()}</td>
+                <td>${date}</td>
+                <td><button class="btn btn-text" onclick="reAnalyzeDocument('${doc.id}')">Analyze Again</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="4" style="color: var(--danger); text-align: center; padding: 2rem">Failed to load documents</td></tr>';
+    }
+}
+
+window.viewExistingReport = async (docId) => {
+    try {
+        showSection('processing');
+        document.getElementById('process-title').textContent = 'Loading Report...';
+        document.getElementById('process-step').textContent = 'Fetching analysis from database.';
+
+        documentId = docId;
+        const res = await fetch(`${API_BASE}/review/${docId}/report`);
+        if (!res.ok) throw new Error('Report not found');
+
+        complianceReport = await res.json();
+        renderComplianceReport(complianceReport);
+        showSection('report');
+    } catch (err) {
+        alert(err.message);
+        document.querySelector('[data-nav="history"]').click();
+    }
+};
+
+window.reAnalyzeDocument = async (docId) => {
+    try {
+        showSection('processing');
+        documentId = docId;
+
+        const res = await fetch(`${API_BASE}/modules/${docId}`);
+        if (!res.ok) throw new Error('Could not load document module');
+
+        trainingModule = await res.json();
+        renderTrainingModule(trainingModule);
+        showSection('module');
+    } catch (err) {
+        alert(err.message);
+        document.querySelector('[data-nav="documents"]').click();
+    }
+};
 
 // --- Training Module Logic ---
 function renderTrainingModule(module) {
@@ -283,9 +445,15 @@ function renderComplianceReport(report) {
 
 // --- Navigation & UI Utilities ---
 function showSection(sectionId) {
-    document.querySelectorAll('section').forEach(s => s.classList.add('hidden'));
-    document.getElementById(`${sectionId}-section`).classList.remove('hidden');
-    document.getElementById(`${sectionId}-section`).classList.add('active');
+    document.querySelectorAll('section').forEach(s => {
+        s.classList.add('hidden');
+        s.classList.remove('active');
+    });
+    const section = document.getElementById(`${sectionId}-section`);
+    if (section) {
+        section.classList.remove('hidden');
+        section.classList.add('active');
+    }
 }
 
 function updateProgress(percent, status) {

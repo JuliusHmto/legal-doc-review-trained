@@ -1,14 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LegalGuard ID | Indonesian Law Compliance AI</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
+
 <body class="dark-theme">
     <div class="background-blobs">
         <div class="blob blob-1"></div>
@@ -16,154 +20,228 @@
         <div class="blob blob-3"></div>
     </div>
 
-    <nav class="navbar">
-        <div class="container">
-            <div class="logo">
-                <span class="logo-icon">⚖️</span>
-                <span class="logo-text">LegalGuard<span class="logo-accent">.ID</span></span>
-            </div>
-            <div class="nav-status">
-                <span class="status-dot"></span>
-                <span id="system-status">System Ready</span>
-            </div>
-        </div>
-    </nav>
-
-    <main class="container">
-        <!-- Step 1: Upload Section -->
-        <section id="upload-section" class="card active">
-            <div class="card-header">
-                <h2>1. Start Review Process</h2>
-                <p>Upload your company document for AI training & compliance analysis.</p>
-            </div>
-            <div class="upload-area" id="drop-zone">
-                <div class="upload-content">
-                    <div class="icon-circle">
-                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-main">
+                <div class="logo">
+                    <span class="logo-icon">⚖️</span>
+                    <span class="logo-text">LegalGuard<span class="logo-accent">.ID</span></span>
+                </div>
+                <nav class="nav-links">
+                    <div class="nav-item active" data-nav="upload">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 5v14M5 12h14" />
                         </svg>
+                        <span>New Review</span>
                     </div>
-                    <h3>Drag and drop your file</h3>
-                    <p>PDF, DOCX, or TXT (Max 10MB)</p>
-                    <input type="file" id="file-input" hidden accept=".pdf,.docx,.doc,.txt">
-                    <button class="btn btn-primary" onclick="document.getElementById('file-input').click()">Browse Files</button>
-                </div>
-            </div>
-            <div id="file-status" class="hidden">
-                <div class="file-info">
-                    <span class="file-name">filename.pdf</span>
-                    <button class="btn-text" id="remove-file">Remove</button>
-                </div>
-                <button class="btn btn-large btn-glow" id="start-process-btn">Initialize Training Module</button>
-            </div>
-        </section>
-
-        <!-- Loading / Progress Section -->
-        <section id="processing-section" class="card hidden">
-            <div class="processing-content">
-                <div class="loading-spinner"></div>
-                <h2 id="process-title">Developing Training Module...</h2>
-                <p id="process-step">Analyzing document structure and extracting key clauses.</p>
-                <div class="progress-bar-container">
-                    <div class="progress-bar" id="main-progress" style="width: 10%;"></div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Step 2: Training Module View -->
-        <section id="module-section" class="card hidden">
-            <div class="card-header">
-                <div class="header-main">
-                    <h2>2. AI Training Module</h2>
-                    <span class="badge" id="doc-type-badge">Employment Contract</span>
-                </div>
-                <p>Extracted insights and document mapping for RAG knowledge base.</p>
-            </div>
-            
-            <div class="module-layout">
-                <div class="module-summary glass">
-                    <h3>Summary</h3>
-                    <p id="module-summary-text">Loading summary...</p>
-                    <div class="party-list" id="party-list">
-                        <!-- Parties populated by JS -->
-                    </div>
-                </div>
-
-                <div class="clause-grid" id="clause-list">
-                    <!-- Clauses populated by JS -->
-                </div>
-            </div>
-
-            <div class="action-footer">
-                <div class="law-focus">
-                    <label>Review Focus:</label>
-                    <select id="focus-area-select">
-                        <option value="">All Relevant Laws</option>
-                        <option value="contract">Contract Law</option>
-                        <option value="employment">Employment Law</option>
-                        <option value="corporate">Corporate Law</option>
-                        <option value="data_protection">PDP (Data Privacy)</option>
-                    </select>
-                </div>
-                <button class="btn btn-primary btn-large btn-glow" id="start-review-btn">Check Compliance with Indonesian Law</button>
-            </div>
-        </section>
-
-        <!-- Step 3: Compliance Report -->
-        <section id="report-section" class="card hidden">
-            <div class="card-header report-header">
-                <div>
-                    <h2>3. Compliance Report</h2>
-                    <p>Analysis against current Indonesian regulations and legal standards.</p>
-                </div>
-                <div class="score-container">
-                    <div class="score-circle">
-                        <svg viewBox="0 0 36 36" class="circular-chart">
-                            <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                            <path class="circle" id="score-circle-path" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                            <text x="18" y="20.35" class="percentage" id="score-text">0</text>
+                    <div class="nav-item" data-nav="history">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12 6 12 12 16 14" />
                         </svg>
+                        <span>History</span>
                     </div>
-                    <span class="score-label" id="status-label">NEEDS REVIEW</span>
-                </div>
+                    <div class="nav-item" data-nav="documents">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                            <line x1="16" y1="13" x2="8" y2="13" />
+                            <line x1="16" y1="17" x2="8" y2="17" />
+                            <polyline points="10 9 9 9 8 9" />
+                        </svg>
+                        <span>Documents</span>
+                    </div>
+                </nav>
             </div>
 
-            <div class="report-layout">
-                <div class="issues-list">
-                    <h3>Identified Issues</h3>
-                    <div id="issues-container">
-                        <!-- Issues populated by JS -->
-                    </div>
+            <div class="sidebar-footer">
+                <button class="theme-toggle" id="theme-toggle">
+                    <span id="theme-icon">🌙</span>
+                    <span id="theme-text">Dark Mode</span>
+                </button>
+                <div class="nav-status">
+                    <span class="status-dot"></span>
+                    <span id="system-status">System Ready</span>
                 </div>
+            </div>
+        </aside>
 
-                <div class="recommendations-box glass">
-                    <h3>Recommendations</h3>
-                    <ul id="recommendations-list">
-                        <!-- Recommendations populated by JS -->
-                    </ul>
-                    
-                    <div class="law-references mt-4">
-                        <h3>Legal References</h3>
-                        <div id="law-references-container">
-                            <!-- Laws populated by JS -->
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <div class="content-container">
+                <!-- Section: New Review (Upload) -->
+                <section id="upload-section" class="card active">
+                    <div class="card-header">
+                        <h2>Start Review Process</h2>
+                        <p>Upload your company document for AI training & compliance analysis.</p>
+                    </div>
+                    <div class="upload-area" id="drop-zone">
+                        <div class="upload-content">
+                            <div class="icon-circle">
+                                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+                                </svg>
+                            </div>
+                            <h3>Drag and drop your file</h3>
+                            <p>PDF, DOCX, or TXT (Max 10MB)</p>
+                            <input type="file" id="file-input" hidden accept=".pdf,.docx,.doc,.txt">
+                            <button class="btn btn-primary"
+                                onclick="document.getElementById('file-input').click()">Browse Files</button>
                         </div>
                     </div>
-                </div>
-            </div>
+                    <div id="file-status" class="hidden">
+                        <div class="file-info">
+                            <span class="file-name">filename.pdf</span>
+                            <button class="btn-text" id="remove-file">Remove</button>
+                        </div>
+                        <button class="btn btn-large btn-glow" id="start-process-btn">Initialize Training
+                            Module</button>
+                    </div>
+                </section>
 
-            <div class="action-footer">
-                <button class="btn btn-outline" onclick="window.location.reload()">New Analysis</button>
-                <button class="btn btn-primary" id="download-report-btn">Export Report</button>
-            </div>
-        </section>
-    </main>
+                <!-- Section: History -->
+                <section id="history-section" class="card hidden">
+                    <div class="card-header">
+                        <h2>History Analysis</h2>
+                        <p>Review and analyze past document compliance checks.</p>
+                    </div>
+                    <div class="data-table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Document</th>
+                                    <th>Score</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-table-body">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
 
-    <footer class="main-footer">
-        <div class="container">
-            <p>&copy; 2025 LegalGuard.ID | Powered by OpenAI & RAG Technology</p>
-        </div>
-    </footer>
+                <!-- Section: Documents -->
+                <section id="documents-section" class="card hidden">
+                    <div class="card-header">
+                        <h2>Uploaded Documents</h2>
+                        <p>Manage and access all documents uploaded to the system.</p>
+                    </div>
+                    <div class="data-table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Filename</th>
+                                    <th>Type</th>
+                                    <th>Uploaded At</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="documents-table-body">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Section: Processing -->
+                <section id="processing-section" class="card hidden">
+                    <div class="processing-content">
+                        <div class="loading-spinner"></div>
+                        <h2 id="process-title">Processing...</h2>
+                        <p id="process-step">Please wait while we analyze your document.</p>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar" id="main-progress" style="width: 10%;"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Section: Module View -->
+                <section id="module-section" class="card hidden">
+                    <div class="card-header">
+                        <div class="header-main"
+                            style="display: flex; justify-content: space-between; align-items: center">
+                            <h2>AI Training Module</h2>
+                            <span class="badge" id="doc-type-badge">Document</span>
+                        </div>
+                        <p>Extracted insights and document mapping.</p>
+                    </div>
+                    <div class="module-layout">
+                        <div class="module-summary glass">
+                            <h3>Summary</h3>
+                            <p id="module-summary-text">Loading...</p>
+                            <div class="party-list" id="party-list"
+                                style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem"></div>
+                        </div>
+                        <div class="clause-grid" id="clause-list"></div>
+                    </div>
+                    <div class="action-footer">
+                        <div class="law-focus">
+                            <label>Review Focus:</label>
+                            <select id="focus-area-select">
+                                <option value="">All Relevant Laws</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary btn-large btn-glow" id="start-review-btn">Check
+                            Compliance</button>
+                    </div>
+                </section>
+
+                <!-- Section: Report View -->
+                <section id="report-section" class="card hidden">
+                    <div class="card-header report-header">
+                        <div>
+                            <h2>Compliance Report</h2>
+                            <p>Analysis against Indonesian regulations.</p>
+                        </div>
+                        <div class="score-container">
+                            <div class="score-circle">
+                                <svg viewBox="0 0 36 36" class="circular-chart">
+                                    <path class="circle-bg"
+                                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                    <path class="circle" id="score-circle-path" stroke-dasharray="0, 100"
+                                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                    <text x="18" y="20.35" class="percentage" id="score-text">0</text>
+                                </svg>
+                            </div>
+                            <span class="score-label" id="status-label">NEEDS REVIEW</span>
+                        </div>
+                    </div>
+                    <div class="report-layout">
+                        <div class="issues-list">
+                            <h3>Identified Issues</h3>
+                            <div id="issues-container"></div>
+                        </div>
+                        <div class="recommendations-box glass">
+                            <h3>Recommendations</h3>
+                            <ul id="recommendations-list"></ul>
+                            <div class="law-references mt-4">
+                                <h3>Legal References</h3>
+                                <div id="law-references-container"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="action-footer">
+                        <button class="btn btn-outline" id="back-to-new-btn">New Analysis</button>
+                        <button class="btn btn-primary" id="download-report-btn">Export Report</button>
+                    </div>
+                </section>
+
+                <footer class="main-footer">
+                    <p>&copy; 2025 LegalGuard.ID | Powered by OpenAI & RAG</p>
+                </footer>
+            </div>
+        </main>
+    </div>
 
     <script src="app.js"></script>
 </body>
+
 </html>

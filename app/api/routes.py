@@ -13,7 +13,9 @@ from app.models.schemas import (
     TrainingModuleResponse, 
     ReviewResponse,
     ReviewRequest,
-    ReviewSummary
+    ReviewSummary,
+    HistoryItem,
+    DocumentResponse
 )
 from app.services.document_processor import DocumentProcessor
 from app.services.training_module import TrainingModuleGenerator
@@ -199,3 +201,42 @@ async def get_compliance_report(
 async def get_law_categories():
     """Get available Indonesian law categories."""
     return review_service.get_available_categories()
+
+@router.get("/history", response_model=List[HistoryItem])
+async def get_review_history(db: AsyncSession = Depends(get_db)):
+    """Get all past compliance reviews with document names."""
+    query = (
+        select(ReviewResult, Document.filename)
+        .join(Document, ReviewResult.document_id == Document.id)
+        .order_by(ReviewResult.reviewed_at.desc())
+    )
+    result = await db.execute(query)
+    history = []
+    
+    for row in result:
+        review = row[0]
+        filename = row[1]
+        
+        # Determine status
+        score = review.compliance_score
+        if score >= 90: status = "COMPLIANT"
+        elif score >= 70: status = "MOSTLY COMPLIANT"
+        elif score >= 50: status = "NEEDS REVIEW"
+        else: status = "NON-COMPLIANT"
+        
+        history.append(HistoryItem(
+            review_id=review.id,
+            document_id=review.document_id,
+            filename=filename,
+            compliance_score=score,
+            reviewed_at=review.reviewed_at,
+            status=status
+        ))
+        
+    return history
+
+@router.get("/documents", response_model=List[DocumentResponse])
+async def list_documents(db: AsyncSession = Depends(get_db)):
+    """List all uploaded documents."""
+    result = await db.execute(select(Document).order_by(Document.uploaded_at.desc()))
+    return result.scalars().all()
