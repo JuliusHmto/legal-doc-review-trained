@@ -79,6 +79,21 @@ class ReviewResult(Base):
     reviewed_at = Column(DateTime, server_default=func.now())
 
 
+class CleanupResult(Base):
+    """NDA cleanup and completion results."""
+    __tablename__ = "cleanup_results"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    document_id = Column(UUID(as_uuid=True), ForeignKey("documents.id"), nullable=False)
+    original_content = Column(Text)  # Original document content
+    cleaned_indonesian = Column(Text)  # Cleaned Indonesian text
+    cleaned_english = Column(Text)  # Cleaned English text
+    change_summary = Column(JSONB)  # List of changes made
+    open_items = Column(JSONB)  # Placeholders needing review
+    issues = Column(JSONB)  # Detailed issue list
+    created_at = Column(DateTime, server_default=func.now())
+
+
 async def init_db():
     """Initialize database tables and pgvector extension."""
     async with engine.begin() as conn:

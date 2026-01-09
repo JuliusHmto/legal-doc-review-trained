@@ -163,11 +163,84 @@
                     </div>
                 </section>
 
+                <!-- Section: NDA Cleanup Results -->
+                <section id="cleanup-section" class="card hidden">
+                    <div class="card-header">
+                        <div class="header-main">
+                            <div>
+                                <h2>NDA Cleanup Analysis</h2>
+                                <p>Side-by-side comparison of original and cleaned document</p>
+                            </div>
+                            <div class="cleanup-stats-badge">
+                                <span class="badge badge-issues" id="cleanup-issue-count">0 Issues</span>
+                                <span class="badge badge-changes" id="cleanup-change-count">0 Changes</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Open Items Alert -->
+                    <div id="open-items-alert" class="alert alert-warning hidden">
+                        <div class="alert-icon">⚠️</div>
+                        <div class="alert-content">
+                            <strong>Manual Review Required</strong>
+                            <p id="open-items-text">Some placeholders need your attention.</p>
+                        </div>
+                    </div>
+
+                    <!-- Side-by-Side Comparison -->
+                    <div class="cleanup-comparison">
+                        <div class="comparison-column original-column">
+                            <div class="column-header">
+                                <h3>Original Document</h3>
+                                <span class="badge badge-original">Before</span>
+                            </div>
+                            <div class="document-content" id="original-content">
+                                <!-- Original document text with highlighted issues -->
+                            </div>
+                        </div>
+                        <div class="comparison-column cleaned-column">
+                            <div class="column-header">
+                                <div class="language-tabs">
+                                    <button class="tab-btn active" data-lang="indonesian">Indonesian</button>
+                                    <button class="tab-btn" data-lang="english">English</button>
+                                </div>
+                                <span class="badge badge-cleaned">After</span>
+                            </div>
+                            <div class="document-content" id="cleaned-content-indonesian">
+                                <!-- Cleaned Indonesian text -->
+                            </div>
+                            <div class="document-content hidden" id="cleaned-content-english">
+                                <!-- Cleaned English text -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Issues List -->
+                    <div class="cleanup-issues-section">
+                        <h3>Issues Found</h3>
+                        <div class="issues-grid" id="cleanup-issues-list">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Change Summary -->
+                    <div class="cleanup-summary-section glass">
+                        <h3>Change Summary</h3>
+                        <ul class="change-summary-list" id="change-summary-list">
+                            <!-- Populated by JS -->
+                        </ul>
+                    </div>
+
+                    <div class="action-footer">
+                        <button class="btn btn-outline" id="skip-to-module-btn">Continue to Training Module</button>
+                        <button class="btn btn-primary" id="rerun-cleanup-btn">Re-run Cleanup</button>
+                    </div>
+                </section>
+
                 <!-- Section: Module View -->
                 <section id="module-section" class="card hidden">
                     <div class="card-header">
-                        <div class="header-main"
-                            style="display: flex; justify-content: space-between; align-items: center">
+                        <div class="header-main">
                             <h2>AI Training Module</h2>
                             <span class="badge" id="doc-type-badge">Document</span>
                         </div>

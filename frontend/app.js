@@ -7,6 +7,7 @@ let currentStep = 'upload';
 let documentId = null;
 let trainingModule = null;
 let complianceReport = null;
+let cleanupResult = null;
 
 // DOM Elements
 const dropZone = document.getElementById('drop-zone');
@@ -26,6 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupDragAndDrop();
     loadLawCategories();
     setupNavigation();
+    setupCleanupSection();
 });
 
 // --- Theme Management ---
@@ -131,7 +133,7 @@ startProcessBtn.addEventListener('click', async () => {
         showSection('processing');
         updateProgress(0, 'Uploading document...');
 
-        // 1. Upload Document
+        // 1. Upload Document (this also triggers NDA cleanup analysis)
         const formData = new FormData();
         formData.append('file', file);
 
@@ -144,9 +146,30 @@ startProcessBtn.addEventListener('click', async () => {
         const uploadData = await uploadRes.json();
         documentId = uploadData.id;
 
-        updateProgress(30, 'Analyzing structure and creating training module...');
+        updateProgress(40, 'Running NDA cleanup analysis...');
 
-        // 2. Create Training Module
+        // 2. Fetch cleanup results
+        try {
+            const cleanupRes = await fetch(`${API_BASE}/cleanup/${documentId}`);
+            if (cleanupRes.ok) {
+                cleanupResult = await cleanupRes.json();
+                updateProgress(70, 'Cleanup analysis complete!');
+                
+                // Show cleanup results first
+                setTimeout(() => {
+                    renderCleanupResults(cleanupResult);
+                    showSection('cleanup');
+                }, 500);
+                return;
+            }
+        } catch (cleanupErr) {
+            console.warn('Cleanup results not available:', cleanupErr);
+        }
+
+        // If no cleanup results, proceed directly to training module
+        updateProgress(70, 'Analyzing structure and creating training module...');
+
+        // 3. Create Training Module
         const moduleRes = await fetch(`${API_BASE}/modules/create/${documentId}`, {
             method: 'POST'
         });
@@ -465,3 +488,228 @@ function updateProgress(percent, status) {
 document.getElementById('download-report-btn').addEventListener('click', () => {
     alert('Preparing PDF export... (Feature coming soon)');
 });
+
+// --- NDA Cleanup Section Logic ---
+
+function setupCleanupSection() {
+    // Language tab switching
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const lang = btn.getAttribute('data-lang');
+            
+            // Update active tab
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            // Show corresponding content
+            document.getElementById('cleaned-content-indonesian').classList.toggle('hidden', lang !== 'indonesian');
+            document.getElementById('cleaned-content-english').classList.toggle('hidden', lang !== 'english');
+        });
+    });
+
+    // Skip to module button
+    document.getElementById('skip-to-module-btn').addEventListener('click', async () => {
+        if (!documentId) return;
+        
+        try {
+            showSection('processing');
+            document.getElementById('process-title').textContent = 'Creating Training Module...';
+            updateProgress(30, 'Analyzing document structure...');
+
+            const moduleRes = await fetch(`${API_BASE}/modules/create/${documentId}`, {
+                method: 'POST'
+            });
+
+            if (!moduleRes.ok) throw new Error('Module creation failed');
+            trainingModule = await moduleRes.json();
+
+            updateProgress(100, 'Module ready!');
+
+            setTimeout(() => {
+                renderTrainingModule(trainingModule);
+                showSection('module');
+            }, 500);
+        } catch (err) {
+            console.error(err);
+            alert('Error: ' + err.message);
+            showSection('cleanup');
+        }
+    });
+
+    // Re-run cleanup button
+    document.getElementById('rerun-cleanup-btn').addEventListener('click', async () => {
+        if (!documentId) return;
+        
+        try {
+            showSection('processing');
+            document.getElementById('process-title').textContent = 'Re-running Cleanup Analysis...';
+            updateProgress(30, 'Analyzing document with LLM...');
+
+            const res = await fetch(`${API_BASE}/cleanup/${documentId}/rerun`, {
+                method: 'POST'
+            });
+
+            if (!res.ok) throw new Error('Cleanup failed');
+            cleanupResult = await res.json();
+
+            updateProgress(100, 'Analysis complete!');
+
+            setTimeout(() => {
+                renderCleanupResults(cleanupResult);
+                showSection('cleanup');
+            }, 500);
+        } catch (err) {
+            console.error(err);
+            alert('Error: ' + err.message);
+            showSection('cleanup');
+        }
+    });
+}
+
+function renderCleanupResults(result) {
+    // Update stats badges
+    const issues = result.issues || [];
+    const changes = result.change_summary || [];
+    const openItems = result.open_items || [];
+
+    document.getElementById('cleanup-issue-count').textContent = `${issues.length} Issue${issues.length !== 1 ? 's' : ''}`;
+    document.getElementById('cleanup-change-count').textContent = `${changes.length} Change${changes.length !== 1 ? 's' : ''}`;
+
+    // Show/hide open items alert
+    const openItemsAlert = document.getElementById('open-items-alert');
+    if (openItems.length > 0) {
+        openItemsAlert.classList.remove('hidden');
+        const placeholders = openItems.map(item => item.placeholder).join(', ');
+        document.getElementById('open-items-text').textContent = 
+            `The following placeholders need your attention: ${placeholders}`;
+    } else {
+        openItemsAlert.classList.add('hidden');
+    }
+
+    // Render original content with highlighted issues
+    const originalContent = document.getElementById('original-content');
+    let originalText = result.original_content || '';
+    
+    // Highlight issues in original text
+    issues.forEach(issue => {
+        if (issue.original_text) {
+            const escapedText = escapeHtml(issue.original_text);
+            const highlightClass = getIssueHighlightClass(issue.type);
+            originalText = originalText.replace(
+                issue.original_text,
+                `<mark class="${highlightClass}" title="${escapeHtml(issue.rule)}">${escapedText}</mark>`
+            );
+        }
+    });
+    
+    originalContent.innerHTML = `<pre class="document-text">${formatDocumentText(originalText)}</pre>`;
+
+    // Render cleaned Indonesian content
+    const cleanedIndonesian = document.getElementById('cleaned-content-indonesian');
+    cleanedIndonesian.innerHTML = `<pre class="document-text">${formatDocumentText(result.cleaned_indonesian || 'No Indonesian text available.')}</pre>`;
+
+    // Render cleaned English content
+    const cleanedEnglish = document.getElementById('cleaned-content-english');
+    cleanedEnglish.innerHTML = `<pre class="document-text">${formatDocumentText(result.cleaned_english || 'No English text available.')}</pre>`;
+
+    // Render issues list
+    const issuesList = document.getElementById('cleanup-issues-list');
+    issuesList.innerHTML = '';
+    
+    if (issues.length === 0) {
+        issuesList.innerHTML = '<div class="empty-issues glass"><p>No issues found in this document.</p></div>';
+    } else {
+        issues.forEach(issue => {
+            const div = document.createElement('div');
+            div.className = `cleanup-issue-card issue-type-${issue.type || 'general'}`;
+            div.innerHTML = `
+                <div class="issue-type-badge">${formatIssueType(issue.type)}</div>
+                <div class="issue-location">${escapeHtml(issue.location || 'Unknown location')}</div>
+                <div class="issue-original-text">"${escapeHtml(truncateText(issue.original_text, 100))}"</div>
+                <div class="issue-rule">${escapeHtml(issue.rule || 'General cleanup rule')}</div>
+            `;
+            issuesList.appendChild(div);
+        });
+    }
+
+    // Render change summary
+    const changeSummaryList = document.getElementById('change-summary-list');
+    changeSummaryList.innerHTML = '';
+    
+    if (changes.length === 0) {
+        changeSummaryList.innerHTML = '<li class="no-changes">No changes were necessary.</li>';
+    } else {
+        changes.forEach(change => {
+            const li = document.createElement('li');
+            li.innerHTML = `<span class="change-icon">✓</span> ${escapeHtml(change)}`;
+            changeSummaryList.appendChild(li);
+        });
+    }
+}
+
+function getIssueHighlightClass(type) {
+    const typeMap = {
+        'terminology': 'highlight-terminology',
+        'deletion': 'highlight-deletion',
+        'formatting': 'highlight-formatting',
+        'party_label': 'highlight-party',
+        'arbitration': 'highlight-arbitration',
+        'signature': 'highlight-signature'
+    };
+    return typeMap[type] || 'highlight-general';
+}
+
+function formatIssueType(type) {
+    const typeMap = {
+        'terminology': 'Terminology',
+        'deletion': 'Deletion Required',
+        'formatting': 'Formatting',
+        'party_label': 'Party Label',
+        'arbitration': 'Arbitration Clause',
+        'signature': 'Signature'
+    };
+    return typeMap[type] || 'General';
+}
+
+function formatDocumentText(text) {
+    if (!text) return '';
+    // Preserve line breaks and basic formatting
+    return text
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\n/g, '<br>')
+        .replace(/\t/g, '&nbsp;&nbsp;&nbsp;&nbsp;');
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function truncateText(text, maxLength) {
+    if (!text) return '';
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+}
+
+// View cleanup results for existing document
+window.viewCleanupResults = async (docId) => {
+    try {
+        showSection('processing');
+        document.getElementById('process-title').textContent = 'Loading Cleanup Results...';
+        document.getElementById('process-step').textContent = 'Fetching analysis from database.';
+
+        documentId = docId;
+        const res = await fetch(`${API_BASE}/cleanup/${docId}`);
+        if (!res.ok) throw new Error('Cleanup results not found');
+
+        cleanupResult = await res.json();
+        renderCleanupResults(cleanupResult);
+        showSection('cleanup');
+    } catch (err) {
+        alert(err.message);
+        document.querySelector('[data-nav="documents"]').click();
+    }
+};

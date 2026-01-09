@@ -7,7 +7,7 @@ from sqlalchemy import select
 from typing import List, Optional
 import uuid
 
-from app.database import get_db, Document, TrainingModule, ReviewResult
+from app.database import get_db, Document, TrainingModule, ReviewResult, CleanupResult
 from app.models.schemas import (
     DocumentUploadResponse, 
     TrainingModuleResponse, 
@@ -15,12 +15,14 @@ from app.models.schemas import (
     ReviewRequest,
     ReviewSummary,
     HistoryItem,
-    DocumentResponse
+    DocumentResponse,
+    CleanupResultResponse
 )
 from app.services.document_processor import DocumentProcessor
 from app.services.training_module import TrainingModuleGenerator
 from app.services.rag_service import RAGService
 from app.services.compliance_review import ComplianceReviewService
+from app.services.nda_cleanup_service import NDACleanupService
 
 router = APIRouter()
 
@@ -29,13 +31,14 @@ doc_processor = DocumentProcessor()
 module_gen = TrainingModuleGenerator()
 rag_service = RAGService()
 review_service = ComplianceReviewService()
+cleanup_service = NDACleanupService()
 
 @router.post("/documents/upload", response_model=DocumentUploadResponse)
 async def upload_document(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db)
 ):
-    """Upload a document and extract its content."""
+    """Upload a document and extract its content, then automatically run NDA cleanup analysis."""
     if not doc_processor.validate_file(file.filename):
         raise HTTPException(status_code=400, detail="Unsupported file type")
     
@@ -57,6 +60,26 @@ async def upload_document(
     )
     db.add(db_doc)
     await db.flush()
+    
+    # Automatically run NDA cleanup analysis
+    try:
+        cleanup_result = await cleanup_service.perform_cleanup(text_content)
+        
+        # Store cleanup result in database
+        db_cleanup = CleanupResult(
+            document_id=db_doc.id,
+            original_content=text_content,
+            cleaned_indonesian=cleanup_result.get("cleaned_indonesian", ""),
+            cleaned_english=cleanup_result.get("cleaned_english", ""),
+            change_summary=cleanup_result.get("change_summary", []),
+            open_items=cleanup_result.get("open_items", []),
+            issues=cleanup_result.get("issues", [])
+        )
+        db.add(db_cleanup)
+        await db.flush()
+    except Exception as e:
+        # Log the error but don't fail the upload
+        print(f"NDA cleanup analysis failed: {str(e)}")
     
     return DocumentUploadResponse(
         id=db_doc.id,
@@ -240,3 +263,85 @@ async def list_documents(db: AsyncSession = Depends(get_db)):
     """List all uploaded documents."""
     result = await db.execute(select(Document).order_by(Document.uploaded_at.desc()))
     return result.scalars().all()
+
+
+# ============ NDA Cleanup Endpoints ============
+
+@router.get("/cleanup/{document_id}", response_model=CleanupResultResponse)
+async def get_cleanup_result(
+    document_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get the NDA cleanup result for a document."""
+    result = await db.execute(
+        select(CleanupResult)
+        .where(CleanupResult.document_id == document_id)
+        .order_by(CleanupResult.created_at.desc())
+        .limit(1)
+    )
+    db_cleanup = result.scalar_one_or_none()
+    
+    if not db_cleanup:
+        raise HTTPException(status_code=404, detail="No cleanup result found for this document")
+    
+    return db_cleanup
+
+
+@router.post("/cleanup/{document_id}/rerun", response_model=CleanupResultResponse)
+async def rerun_cleanup(
+    document_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db)
+):
+    """Re-run NDA cleanup analysis for a document."""
+    # Get document
+    doc_result = await db.execute(select(Document).where(Document.id == document_id))
+    db_doc = doc_result.scalar_one_or_none()
+    
+    if not db_doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    # Perform cleanup
+    try:
+        cleanup_result = await cleanup_service.perform_cleanup(db_doc.content)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"NDA cleanup failed: {str(e)}")
+    
+    # Store new cleanup result
+    db_cleanup = CleanupResult(
+        document_id=document_id,
+        original_content=db_doc.content,
+        cleaned_indonesian=cleanup_result.get("cleaned_indonesian", ""),
+        cleaned_english=cleanup_result.get("cleaned_english", ""),
+        change_summary=cleanup_result.get("change_summary", []),
+        open_items=cleanup_result.get("open_items", []),
+        issues=cleanup_result.get("issues", [])
+    )
+    db.add(db_cleanup)
+    await db.flush()
+    
+    return db_cleanup
+
+
+@router.get("/cleanup/{document_id}/issues")
+async def get_cleanup_issues(
+    document_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get only the issues from the cleanup result."""
+    result = await db.execute(
+        select(CleanupResult)
+        .where(CleanupResult.document_id == document_id)
+        .order_by(CleanupResult.created_at.desc())
+        .limit(1)
+    )
+    db_cleanup = result.scalar_one_or_none()
+    
+    if not db_cleanup:
+        raise HTTPException(status_code=404, detail="No cleanup result found for this document")
+    
+    return {
+        "document_id": document_id,
+        "issues": db_cleanup.issues or [],
+        "open_items": db_cleanup.open_items or [],
+        "change_summary": db_cleanup.change_summary or []
+    }
