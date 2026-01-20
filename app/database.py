@@ -88,6 +88,8 @@ class CleanupResult(Base):
     original_content = Column(Text)  # Original document content
     cleaned_indonesian = Column(Text)  # Cleaned Indonesian text
     cleaned_english = Column(Text)  # Cleaned English text
+    edited_indonesian = Column(Text)  # User-edited Indonesian version
+    edited_english = Column(Text)  # User-edited English version
     change_summary = Column(JSONB)  # List of changes made
     open_items = Column(JSONB)  # Placeholders needing review
     issues = Column(JSONB)  # Detailed issue list
@@ -101,6 +103,26 @@ async def init_db():
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         # Create all tables
         await conn.run_sync(Base.metadata.create_all)
+        
+        # Add missing columns if they don't exist (for migrations)
+        await conn.execute(text("""
+            DO $$ 
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'cleanup_results' AND column_name = 'edited_indonesian'
+                ) THEN
+                    ALTER TABLE cleanup_results ADD COLUMN edited_indonesian TEXT;
+                END IF;
+                
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns 
+                    WHERE table_name = 'cleanup_results' AND column_name = 'edited_english'
+                ) THEN
+                    ALTER TABLE cleanup_results ADD COLUMN edited_english TEXT;
+                END IF;
+            END $$;
+        """))
 
 
 async def get_db() -> AsyncSession:

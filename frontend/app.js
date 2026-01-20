@@ -8,6 +8,8 @@ let documentId = null;
 let trainingModule = null;
 let complianceReport = null;
 let cleanupResult = null;
+let editorInstance = null;
+let currentEditorLanguage = 'indonesian';
 
 // DOM Elements
 const dropZone = document.getElementById('drop-zone');
@@ -28,6 +30,8 @@ document.addEventListener('DOMContentLoaded', () => {
     loadLawCategories();
     setupNavigation();
     setupCleanupSection();
+    setupHistoryTabs();
+    setupDocumentEditor();
 });
 
 // --- Theme Management ---
@@ -74,6 +78,7 @@ function setupNavigation() {
             else if (nav === 'history') {
                 showSection('history');
                 loadHistory();
+                loadCleanupHistory();
             }
             else if (nav === 'documents') {
                 showSection('documents');
@@ -713,3 +718,318 @@ window.viewCleanupResults = async (docId) => {
         document.querySelector('[data-nav="documents"]').click();
     }
 };
+
+// ============ History Tabs Logic ============
+
+function setupHistoryTabs() {
+    document.querySelectorAll('.history-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const tabName = tab.getAttribute('data-history-tab');
+            
+            // Update active tab
+            document.querySelectorAll('.history-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            // Show corresponding content
+            document.querySelectorAll('.history-tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            if (tabName === 'compliance') {
+                document.getElementById('compliance-history-content').classList.add('active');
+            } else if (tabName === 'cleanup') {
+                document.getElementById('cleanup-history-content').classList.add('active');
+            }
+        });
+    });
+}
+
+async function loadCleanupHistory() {
+    const tbody = document.getElementById('cleanup-history-table-body');
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 2rem">Loading cleanup history...</td></tr>';
+
+    try {
+        const res = await fetch(`${API_BASE}/cleanup/history`);
+        const history = await res.json();
+
+        if (history.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><div class="empty-state-icon">📋</div>No NDA cleanup analyses found. Upload a document to get started!</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = '';
+        history.forEach(item => {
+            const tr = document.createElement('tr');
+            const date = new Date(item.created_at).toLocaleDateString();
+
+            tr.innerHTML = `
+                <td><strong>${item.filename}</strong></td>
+                <td><span class="cleanup-issue-badge">${item.issue_count} Issue${item.issue_count !== 1 ? 's' : ''}</span></td>
+                <td><span class="cleanup-change-badge">${item.change_count} Change${item.change_count !== 1 ? 's' : ''}</span></td>
+                <td>${date}</td>
+                <td>
+                    <button class="btn btn-text" onclick="viewCleanupResults('${item.document_id}')">View Cleanup</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="5" style="color: var(--danger); text-align: center; padding: 2rem">Failed to load cleanup history</td></tr>';
+    }
+}
+
+// ============ Document Editor Logic ============
+
+function setupDocumentEditor() {
+    // Edit document button
+    document.getElementById('edit-document-btn').addEventListener('click', () => {
+        if (!cleanupResult) return;
+        openDocumentEditor();
+    });
+
+    // Back to cleanup button
+    document.getElementById('back-to-cleanup-btn').addEventListener('click', () => {
+        destroyEditor();
+        showSection('cleanup');
+    });
+
+    // Save document button
+    document.getElementById('save-document-btn').addEventListener('click', saveEditedDocument);
+
+    // Export DOCX button
+    document.getElementById('export-docx-btn').addEventListener('click', exportToDocx);
+
+    // Editor language tabs
+    document.querySelectorAll('.editor-lang-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const lang = btn.getAttribute('data-editor-lang');
+            switchEditorLanguage(lang);
+        });
+    });
+}
+
+function openDocumentEditor() {
+    showSection('editor');
+    currentEditorLanguage = 'indonesian';
+    
+    // Update language tab UI
+    document.querySelectorAll('.editor-lang-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-editor-lang') === currentEditorLanguage);
+    });
+    
+    // Initialize Quill with the cleaned content
+    initQuillEditor();
+}
+
+function initQuillEditor() {
+    // Destroy existing instance if any
+    destroyEditor();
+    
+    // Get the content to load
+    const content = currentEditorLanguage === 'indonesian' 
+        ? (cleanupResult.edited_indonesian || cleanupResult.cleaned_indonesian || '')
+        : (cleanupResult.edited_english || cleanupResult.cleaned_english || '');
+    
+    // Convert plain text to HTML if needed
+    const htmlContent = convertTextToHtml(content);
+    
+    // Initialize Quill
+    editorInstance = new Quill('#document-editor', {
+        theme: 'snow',
+        modules: {
+            toolbar: [
+                [{ 'header': [1, 2, 3, false] }],
+                ['bold', 'italic', 'underline', 'strike'],
+                [{ 'align': [] }],
+                [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                [{ 'indent': '-1'}, { 'indent': '+1' }],
+                ['blockquote'],
+                [{ 'color': [] }, { 'background': [] }],
+                ['link', 'image'],
+                ['clean']
+            ]
+        }
+    });
+
+    // Set content
+    editorInstance.clipboard.dangerouslyPasteHTML(htmlContent);
+    
+    // Setup event handlers
+    editorInstance.on('text-change', function() {
+        updateWordCount();
+        updateEditorStatus('Unsaved changes');
+    });
+
+    updateWordCount();
+    updateEditorStatus('Ready');
+}
+
+function destroyEditor() {
+    if (editorInstance) {
+        // Quill doesn't have a formal destroy method like TinyMCE, 
+        // but we can clear the container and remove the toolbar
+        const editorContainer = document.getElementById('document-editor');
+        if (editorContainer) {
+            editorContainer.innerHTML = '';
+            // Remove the toolbar added by Quill
+            const toolbar = document.querySelector('.ql-toolbar');
+            if (toolbar) {
+                toolbar.remove();
+            }
+        }
+        editorInstance = null;
+    }
+}
+
+function switchEditorLanguage(lang) {
+    // Save current content before switching
+    if (editorInstance && cleanupResult) {
+        const currentContent = editorInstance.root.innerHTML;
+        if (currentEditorLanguage === 'indonesian') {
+            cleanupResult.edited_indonesian = currentContent;
+        } else {
+            cleanupResult.edited_english = currentContent;
+        }
+    }
+    
+    currentEditorLanguage = lang;
+    
+    // Update language tab UI
+    document.querySelectorAll('.editor-lang-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-editor-lang') === lang);
+    });
+    
+    // Reinitialize editor with new language content
+    initQuillEditor();
+}
+
+async function saveEditedDocument() {
+    if (!editorInstance || !documentId) return;
+    
+    updateEditorStatus('Saving...', 'saving');
+    
+    try {
+        const content = editorInstance.root.innerHTML;
+        
+        const res = await fetch(`${API_BASE}/cleanup/${documentId}/save`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                content_html: content,
+                language: currentEditorLanguage
+            })
+        });
+        
+        if (!res.ok) throw new Error('Failed to save document');
+        
+        // Update local state
+        const savedResult = await res.json();
+        if (currentEditorLanguage === 'indonesian') {
+            cleanupResult.edited_indonesian = content;
+        } else {
+            cleanupResult.edited_english = content;
+        }
+        
+        updateEditorStatus('Saved successfully', 'saved');
+        
+        // Reset status after 3 seconds
+        setTimeout(() => updateEditorStatus('Ready'), 3000);
+        
+    } catch (err) {
+        console.error(err);
+        updateEditorStatus('Error saving', 'error');
+        alert('Failed to save document: ' + err.message);
+    }
+}
+
+function exportToDocx() {
+    if (!editorInstance) return;
+    
+    const content = editorInstance.root.innerHTML;
+    const filename = `document_${currentEditorLanguage}_${new Date().toISOString().split('T')[0]}.html`;
+    
+    // Create a complete HTML document
+    const htmlDoc = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Legal Document</title>
+    <style>
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 12pt;
+            line-height: 1.6;
+            margin: 1in;
+        }
+        h1 { font-size: 18pt; font-weight: bold; }
+        h2 { font-size: 14pt; font-weight: bold; }
+        h3 { font-size: 12pt; font-weight: bold; }
+        p { text-align: justify; }
+        table { border-collapse: collapse; width: 100%; }
+        table td, table th { border: 1px solid #000; padding: 6pt; }
+    </style>
+</head>
+<body>
+${content}
+</body>
+</html>`;
+    
+    // Create download
+    const blob = new Blob([htmlDoc], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    // Show instructions for converting to DOCX
+    alert('HTML file downloaded. To convert to DOCX:\n\n1. Open the HTML file in Microsoft Word\n2. Save As > Word Document (.docx)\n\nOr use an online converter like CloudConvert.');
+}
+
+function convertTextToHtml(text) {
+    if (!text) return '<p></p>';
+    
+    // If it already looks like HTML, return as is
+    if (text.trim().startsWith('<')) {
+        return text;
+    }
+    
+    // Convert plain text to HTML
+    const paragraphs = text.split(/\n\n+/);
+    let html = '';
+    
+    paragraphs.forEach(para => {
+        para = para.trim();
+        if (!para) return;
+        
+        // Check if it's a heading (all caps or numbered)
+        if (/^[A-Z][A-Z\s]+$/.test(para) || /^(PASAL|ARTICLE|BAB|CHAPTER)\s*\d+/i.test(para)) {
+            html += `<h2>${escapeHtml(para)}</h2>\n`;
+        } else if (/^\d+\.\s/.test(para)) {
+            // Numbered paragraph
+            html += `<p>${escapeHtml(para)}</p>\n`;
+        } else {
+            html += `<p>${escapeHtml(para.replace(/\n/g, '<br>'))}</p>\n`;
+        }
+    });
+    
+    return html || '<p></p>';
+}
+
+function updateWordCount() {
+    if (!editorInstance) return;
+    
+    const content = editorInstance.getText();
+    const words = content.trim().split(/\s+/).filter(w => w.length > 0).length;
+    document.getElementById('editor-word-count').textContent = `${words} word${words !== 1 ? 's' : ''}`;
+}
+
+function updateEditorStatus(status, className = '') {
+    const statusEl = document.getElementById('editor-status');
+    statusEl.textContent = status;
+    statusEl.className = 'editor-status ' + className;
+}

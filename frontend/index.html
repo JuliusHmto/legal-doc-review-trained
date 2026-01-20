@@ -11,6 +11,9 @@
         href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
+    <!-- Quill Rich Text Editor -->
+    <link href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
 </head>
 
 <body class="dark-theme">
@@ -108,23 +111,66 @@
                 <section id="history-section" class="card hidden">
                     <div class="card-header">
                         <h2>History Analysis</h2>
-                        <p>Review and analyze past document compliance checks.</p>
+                        <p>Review and analyze past document analyses.</p>
                     </div>
-                    <div class="data-table-container">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Document</th>
-                                    <th>Score</th>
-                                    <th>Status</th>
-                                    <th>Date</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="history-table-body">
-                                <!-- Populated by JS -->
-                            </tbody>
-                        </table>
+                    
+                    <!-- History Tabs -->
+                    <div class="history-tabs">
+                        <button class="history-tab active" data-history-tab="compliance">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                                <path d="M9 11l3 3L22 4"></path>
+                                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                            </svg>
+                            Compliance Reviews
+                        </button>
+                        <button class="history-tab" data-history-tab="cleanup">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <path d="M9 15l2 2 4-4"></path>
+                            </svg>
+                            NDA Cleanup
+                        </button>
+                    </div>
+
+                    <!-- Compliance History Table -->
+                    <div id="compliance-history-content" class="history-tab-content active">
+                        <div class="data-table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Document</th>
+                                        <th>Score</th>
+                                        <th>Status</th>
+                                        <th>Date</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="history-table-body">
+                                    <!-- Populated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- NDA Cleanup History Table -->
+                    <div id="cleanup-history-content" class="history-tab-content">
+                        <div class="data-table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Document</th>
+                                        <th>Issues</th>
+                                        <th>Changes</th>
+                                        <th>Date</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cleanup-history-table-body">
+                                    <!-- Populated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </section>
 
@@ -233,7 +279,61 @@
 
                     <div class="action-footer">
                         <button class="btn btn-outline" id="skip-to-module-btn">Continue to Training Module</button>
+                        <button class="btn btn-secondary" id="edit-document-btn">Edit Document</button>
                         <button class="btn btn-primary" id="rerun-cleanup-btn">Re-run Cleanup</button>
+                    </div>
+                </section>
+
+                <!-- Section: Document Editor -->
+                <section id="editor-section" class="card hidden">
+                    <div class="card-header">
+                        <div class="header-main">
+                            <div>
+                                <h2>Document Editor</h2>
+                                <p>Edit the cleaned document with full formatting support</p>
+                            </div>
+                            <div class="editor-controls">
+                                <div class="editor-language-tabs">
+                                    <button class="editor-lang-btn active" data-editor-lang="indonesian">Indonesian</button>
+                                    <button class="editor-lang-btn" data-editor-lang="english">English</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Editor Container - A4 Page Style -->
+                    <div class="editor-page-container">
+                        <div class="editor-page">
+                            <div id="document-editor"></div>
+                        </div>
+                    </div>
+
+                    <!-- Editor Status Bar -->
+                    <div class="editor-status-bar">
+                        <span class="editor-status" id="editor-status">Ready</span>
+                        <span class="editor-word-count" id="editor-word-count">0 words</span>
+                    </div>
+
+                    <div class="action-footer">
+                        <button class="btn btn-outline" id="back-to-cleanup-btn">Back to Cleanup</button>
+                        <div class="editor-action-group">
+                            <button class="btn btn-outline" id="export-docx-btn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7 10 12 15 17 10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                                Export DOCX
+                            </button>
+                            <button class="btn btn-primary" id="save-document-btn">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                    <polyline points="7 3 7 8 15 8"></polyline>
+                                </svg>
+                                Save Changes
+                            </button>
+                        </div>
                     </div>
                 </section>
 

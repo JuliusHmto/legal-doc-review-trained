@@ -181,6 +181,8 @@ class CleanupResultResponse(BaseModel):
     original_content: Optional[str]
     cleaned_indonesian: Optional[str]
     cleaned_english: Optional[str]
+    edited_indonesian: Optional[str] = None
+    edited_english: Optional[str] = None
     change_summary: Optional[List[str]]
     open_items: Optional[List[Dict[str, Any]]]
     issues: Optional[List[Dict[str, Any]]]
@@ -199,3 +201,22 @@ class CleanupQuickAnalysis(BaseModel):
     has_signature_issues: bool = False
     summary: str = ""
     estimated_issue_count: int = 0
+
+
+class CleanupHistoryItem(BaseModel):
+    """Combined cleanup result and document info for history list."""
+    cleanup_id: UUID
+    document_id: UUID
+    filename: str
+    issue_count: int
+    change_count: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class EditedDocumentRequest(BaseModel):
+    """Request to save user-edited document content."""
+    content_html: str = Field(..., description="The edited HTML content")
+    language: str = Field(..., description="Language version: 'indonesian' or 'english'")

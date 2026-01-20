@@ -16,7 +16,9 @@ from app.models.schemas import (
     ReviewSummary,
     HistoryItem,
     DocumentResponse,
-    CleanupResultResponse
+    CleanupResultResponse,
+    CleanupHistoryItem,
+    EditedDocumentRequest
 )
 from app.services.document_processor import DocumentProcessor
 from app.services.training_module import TrainingModuleGenerator
@@ -267,6 +269,39 @@ async def list_documents(db: AsyncSession = Depends(get_db)):
 
 # ============ NDA Cleanup Endpoints ============
 
+# Note: /cleanup/history must come BEFORE /cleanup/{document_id} to avoid routing conflicts
+
+@router.get("/cleanup/history", response_model=List[CleanupHistoryItem])
+async def get_cleanup_history(db: AsyncSession = Depends(get_db)):
+    """Get all past NDA cleanup analyses with document names."""
+    query = (
+        select(CleanupResult, Document.filename)
+        .join(Document, CleanupResult.document_id == Document.id)
+        .order_by(CleanupResult.created_at.desc())
+    )
+    result = await db.execute(query)
+    history = []
+    
+    for row in result:
+        cleanup = row[0]
+        filename = row[1]
+        
+        # Count issues and changes
+        issue_count = len(cleanup.issues) if cleanup.issues else 0
+        change_count = len(cleanup.change_summary) if cleanup.change_summary else 0
+        
+        history.append(CleanupHistoryItem(
+            cleanup_id=cleanup.id,
+            document_id=cleanup.document_id,
+            filename=filename,
+            issue_count=issue_count,
+            change_count=change_count,
+            created_at=cleanup.created_at
+        ))
+        
+    return history
+
+
 @router.get("/cleanup/{document_id}", response_model=CleanupResultResponse)
 async def get_cleanup_result(
     document_id: uuid.UUID,
@@ -345,3 +380,35 @@ async def get_cleanup_issues(
         "open_items": db_cleanup.open_items or [],
         "change_summary": db_cleanup.change_summary or []
     }
+
+
+@router.put("/cleanup/{document_id}/save", response_model=CleanupResultResponse)
+async def save_edited_document(
+    document_id: uuid.UUID,
+    content: EditedDocumentRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Save the user-edited cleaned document."""
+    # Get the latest cleanup result for this document
+    result = await db.execute(
+        select(CleanupResult)
+        .where(CleanupResult.document_id == document_id)
+        .order_by(CleanupResult.created_at.desc())
+        .limit(1)
+    )
+    db_cleanup = result.scalar_one_or_none()
+    
+    if not db_cleanup:
+        raise HTTPException(status_code=404, detail="No cleanup result found for this document")
+    
+    # Update the appropriate language version
+    if content.language == "indonesian":
+        db_cleanup.edited_indonesian = content.content_html
+    elif content.language == "english":
+        db_cleanup.edited_english = content.content_html
+    else:
+        raise HTTPException(status_code=400, detail="Invalid language. Use 'indonesian' or 'english'")
+    
+    await db.flush()
+    
+    return db_cleanup
